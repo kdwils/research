@@ -1,0 +1,139 @@
+apiVersion: monitoring.k8s.io/v1alpha1
+kind: HealthCheck
+metadata:
+  name: external-api-health
+  namespace: default
+spec:
+  # Manual endpoints - external services or out-of-cluster targets
+  # These OVERRIDE service discovery if both are specified
+  endpoints:
+    - name: api-server-1
+      address: api1.example.com
+      labels:
+        region: us-east-1
+        tier: production
+
+    - name: api-server-2
+      address: api2.example.com
+      labels:
+        region: us-west-2
+        tier: production
+
+    - name: backup-server
+      address: backup.example.com
+      labels:
+        tier: backup
+
+  interval: 60s
+  timeout: 15s
+  failureThreshold: 2
+  successThreshold: 1
+
+  checks:
+    - name: https-endpoint
+      type: HTTP
+      http:
+        scheme: HTTPS
+        port: 443
+        path: /api/v1/health
+        httpHeaders:
+          - name: User-Agent
+            value: "HealthMonitor/1.0"
+        expectedStatus:
+          - 200
+        expectedBodyContains: "healthy"
+
+    - name: api-version
+      type: HTTP
+      http:
+        scheme: HTTPS
+        port: 443
+        path: /api/version
+        expectedStatus:
+          - 200
+
+  uptime:
+    enabled: true
+    windows:
+      - 1h
+      - 24h
+      - 7d
+
+---
+apiVersion: monitoring.k8s.io/v1alpha1
+kind: HealthCheck
+metadata:
+  name: mixed-mode-health
+  namespace: default
+spec:
+  # This has BOTH targetRef and endpoints specified
+  # Manual endpoints OVERRIDE the discovered service endpoints
+  targetRef:
+    kind: Service
+    name: my-service
+
+  # These manual endpoints override discovered pods
+  endpoints:
+    - name: custom-backend-1
+      address: 10.0.1.100
+    - name: custom-backend-2
+      address: 10.0.1.101
+
+  interval: 30s
+
+  checks:
+    - name: http-check
+      type: HTTP
+      http:
+        port: 8080
+        path: /health
+
+---
+apiVersion: monitoring.k8s.io/v1alpha1
+kind: HealthCheck
+metadata:
+  name: database-external
+  namespace: production
+spec:
+  # External database (outside cluster)
+  endpoints:
+    - name: postgres-primary
+      address: db-primary.example.com
+      labels:
+        role: primary
+
+    - name: postgres-replica-1
+      address: db-replica1.example.com
+      labels:
+        role: replica
+
+    - name: postgres-replica-2
+      address: db-replica2.example.com
+      labels:
+        role: replica
+
+  interval: 120s  # Check every 2 minutes
+  timeout: 30s
+
+  checks:
+    # Check if TCP port is open
+    - name: postgres-port
+      type: TCP
+      tcp:
+        port: 5432
+
+    # Optional: HTTP health endpoint if database exposes one
+    - name: postgres-health
+      type: HTTP
+      http:
+        port: 8008
+        path: /health
+        expectedStatus:
+          - 200
+
+  uptime:
+    enabled: true
+    windows:
+      - 24h
+      - 7d
+      - 30d

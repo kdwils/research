@@ -66,29 +66,52 @@ func (r *HealthCheckReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	// Get target service and pods
-	targetNamespace := hc.Spec.TargetRef.Namespace
-	if targetNamespace == "" {
-		targetNamespace = hc.Namespace
-	}
+	// Get target endpoints (manual override or discovered)
+	var pods []discovery.PodInfo
+	var err error
 
-	pods, err := r.Discovery.GetPodsForService(ctx, targetNamespace, hc.Spec.TargetRef.Name)
-	if err != nil {
-		log.Error(err, "Failed to discover pods for service",
-			"service", hc.Spec.TargetRef.Name,
-			"namespace", targetNamespace)
+	// Priority 1: Use manual endpoints if specified (user override)
+	if len(hc.Spec.Endpoints) > 0 {
+		log.Info("Using manual endpoints (override mode)",
+			"count", len(hc.Spec.Endpoints))
 
-		// Update status to unknown
-		r.updateStatusUnknown(ctx, hc, fmt.Sprintf("Failed to discover pods: %v", err))
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
-	}
+		pods = make([]discovery.PodInfo, 0, len(hc.Spec.Endpoints))
+		for _, ep := range hc.Spec.Endpoints {
+			pods = append(pods, discovery.PodInfo{
+				Name:      ep.Name,
+				Namespace: hc.Namespace,
+				IP:        ep.Address,
+				Ready:     true, // Manual endpoints are assumed ready
+			})
+		}
+	} else if hc.Spec.TargetRef != nil {
+		// Priority 2: Discover from service
+		targetNamespace := hc.Spec.TargetRef.Namespace
+		if targetNamespace == "" {
+			targetNamespace = hc.Namespace
+		}
 
-	if len(pods) == 0 {
-		log.Info("No pods found for service",
-			"service", hc.Spec.TargetRef.Name,
-			"namespace", targetNamespace)
+		pods, err = r.Discovery.GetPodsForService(ctx, targetNamespace, hc.Spec.TargetRef.Name)
+		if err != nil {
+			log.Error(err, "Failed to discover pods for service",
+				"service", hc.Spec.TargetRef.Name,
+				"namespace", targetNamespace)
 
-		r.updateStatusUnknown(ctx, hc, "No pods found for service")
+			r.updateStatusUnknown(ctx, hc, fmt.Sprintf("Failed to discover pods: %v", err))
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		}
+
+		if len(pods) == 0 {
+			log.Info("No pods found for service",
+				"service", hc.Spec.TargetRef.Name,
+				"namespace", targetNamespace)
+
+			r.updateStatusUnknown(ctx, hc, "No pods found for service")
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		}
+	} else {
+		// Neither manual endpoints nor targetRef specified
+		r.updateStatusUnknown(ctx, hc, "No endpoints or targetRef specified")
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
@@ -242,8 +265,17 @@ func (r *HealthCheckReconciler) updateStatus(
 
 	// Build pod health status
 	podHealthStatuses := make([]monitoringv1alpha1.PodHealthStatus, 0, len(pods))
+	isManualEndpoints := len(hc.Spec.Endpoints) > 0
+
 	for _, pod := range pods {
+		endpointType := "pod"
+		if isManualEndpoints {
+			endpointType = "manual"
+		}
+
 		podHealthStatuses = append(podHealthStatuses, monitoringv1alpha1.PodHealthStatus{
+			EndpointName:    pod.Name,
+			EndpointType:    endpointType,
 			PodName:         pod.Name,
 			PodIP:           pod.IP,
 			Healthy:         pod.Ready,

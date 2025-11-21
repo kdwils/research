@@ -29,8 +29,10 @@ func init() {
 
 func main() {
 	var bindAddress string
+	var staticFilesPath string
 
 	flag.StringVar(&bindAddress, "bind-address", ":8080", "The address the dashboard HTTP server binds to.")
+	flag.StringVar(&staticFilesPath, "static-files", "./web/dist", "Path to static frontend files.")
 
 	opts := zap.Options{
 		Development: true,
@@ -40,7 +42,7 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	setupLog.Info("setting up dashboard")
+	setupLog.Info("setting up dashboard", "staticFiles", staticFilesPath)
 
 	// Get Kubernetes config
 	config := ctrl.GetConfigOrDie()
@@ -75,10 +77,10 @@ func main() {
 	}
 
 	// Create and start dashboard server
-	server := dashboard.NewServer(k8sClient, k8sCache)
+	server := dashboard.NewServer(k8sClient, k8sCache, staticFilesPath)
 
 	setupLog.Info("starting dashboard server", "address", bindAddress)
-	if err := server.Start(context.Background(), bindAddress); err != nil {
+	if err := server.Start(ctx, bindAddress); err != nil {
 		setupLog.Error(err, "problem running dashboard server")
 		os.Exit(1)
 	}

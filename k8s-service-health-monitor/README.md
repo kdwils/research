@@ -14,9 +14,11 @@ While Kubernetes provides pod-level liveness and readiness probes, there's no na
 **Service Health Monitor** solves these problems by providing:
 
 - ✅ **Automatic Discovery**: Discovers services, pods, and networking resources (Ingress, Gateway API)
+- ✅ **External Monitoring**: Monitor out-of-cluster services and endpoints
+- ✅ **User-Defined Overrides**: Manual endpoint specification overrides discovered pods
 - ✅ **Custom Health Checks**: HTTP, TCP, gRPC, and Exec checks with response validation
 - ✅ **Uptime Tracking**: Historical uptime metrics across multiple time windows (1h, 24h, 7d, 30d)
-- ✅ **Real-Time Dashboard**: WebSocket-powered UI for live health monitoring
+- ✅ **Real-Time Dashboard**: React-based WebSocket-powered UI for live health monitoring
 - ✅ **Kubernetes-Native**: Uses CRDs, follows K8s conventions, zero external dependencies
 - ✅ **Production-Ready**: Leader election, RBAC, security best practices
 
@@ -176,6 +178,42 @@ checks:
         - "pg_isready -h localhost"
 ```
 
+### External / Out-of-Cluster Health Checks
+
+Monitor services outside your Kubernetes cluster by specifying manual endpoints:
+
+```yaml
+apiVersion: monitoring.k8s.io/v1alpha1
+kind: HealthCheck
+metadata:
+  name: external-api-health
+spec:
+  # Manual endpoints - external services or out-of-cluster targets
+  endpoints:
+    - name: api-server-1
+      address: api1.example.com
+      labels:
+        region: us-east-1
+    - name: api-server-2
+      address: api2.example.com
+      labels:
+        region: us-west-2
+
+  checks:
+    - name: https-endpoint
+      type: HTTP
+      http:
+        scheme: HTTPS
+        port: 443
+        path: /api/v1/health
+```
+
+**User-Defined Overrides**: If both `targetRef` and `endpoints` are specified, manual endpoints take priority and override service discovery. This allows you to:
+- Monitor external APIs and services
+- Test specific backend instances
+- Override discovered pods with custom targets
+- Monitor databases, message queues, or any TCP/HTTP service outside the cluster
+
 ### Multiple Checks Per Service
 
 You can define multiple checks to comprehensively validate service health:
@@ -279,6 +317,7 @@ Automatically discovers:
 See [config/samples/](config/samples/) for complete examples:
 - `http-healthcheck.yaml` - HTTP health check with multiple validations
 - `multi-check-example.yaml` - Comprehensive examples (HTTP, TCP, gRPC, Exec)
+- `external-healthcheck.yaml` - External/out-of-cluster health checks with manual endpoints
 
 ## Development
 
@@ -305,10 +344,34 @@ Run controller locally:
 make run-controller
 ```
 
-Run dashboard locally:
+Run dashboard backend locally:
 ```bash
 make run-dashboard
 ```
+
+### Frontend Development
+
+The dashboard frontend is a React + TypeScript application located in `web/`:
+
+```bash
+cd web
+
+# Install dependencies
+npm install
+
+# Run development server (proxies to backend on :8080)
+npm run dev
+
+# Build for production
+npm run build
+```
+
+Built files are output to `web/dist/` which the dashboard server serves when running with:
+```bash
+./bin/dashboard --static-files=./web/dist
+```
+
+See [web/README.md](web/README.md) for more details.
 
 ### Project Structure
 

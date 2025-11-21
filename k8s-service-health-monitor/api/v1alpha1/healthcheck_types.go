@@ -7,9 +7,14 @@ import (
 
 // HealthCheckSpec defines the desired state of HealthCheck
 type HealthCheckSpec struct {
-	// TargetRef references the Kubernetes resource to monitor
-	// +kubebuilder:validation:Required
-	TargetRef TargetReference `json:"targetRef"`
+	// TargetRef references the Kubernetes resource to monitor (optional if Endpoints specified)
+	// +kubebuilder:validation:Optional
+	TargetRef *TargetReference `json:"targetRef,omitempty"`
+
+	// Endpoints manually specifies target endpoints (external or override discovered)
+	// When specified, these endpoints are used instead of service discovery
+	// +kubebuilder:validation:Optional
+	Endpoints []ManualEndpoint `json:"endpoints,omitempty"`
 
 	// Interval specifies how often to execute health checks
 	// +kubebuilder:validation:Optional
@@ -41,6 +46,21 @@ type HealthCheckSpec struct {
 	// Uptime tracking configuration
 	// +kubebuilder:validation:Optional
 	Uptime *UptimeConfig `json:"uptime,omitempty"`
+}
+
+// ManualEndpoint specifies a manual endpoint to check (external or override)
+type ManualEndpoint struct {
+	// Name of the endpoint (for identification)
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Address is the IP address or hostname
+	// +kubebuilder:validation:Required
+	Address string `json:"address"`
+
+	// Labels for categorization and filtering
+	// +kubebuilder:validation:Optional
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 // TargetReference identifies the target resource to monitor
@@ -263,12 +283,20 @@ type CheckResult struct {
 	Message string `json:"message,omitempty"`
 }
 
-// PodHealthStatus represents health status for a single pod
+// PodHealthStatus represents health status for a single pod or endpoint
 type PodHealthStatus struct {
-	// PodName is the name of the pod
-	PodName string `json:"podName"`
+	// EndpointName is the name of the endpoint (pod name or manual endpoint name)
+	EndpointName string `json:"endpointName"`
 
-	// PodIP is the IP address of the pod
+	// EndpointType indicates if this is a pod or manual endpoint
+	// +kubebuilder:validation:Optional
+	EndpointType string `json:"endpointType,omitempty"` // "pod" or "manual"
+
+	// PodName is the name of the pod (for discovered pods)
+	// +kubebuilder:validation:Optional
+	PodName string `json:"podName,omitempty"`
+
+	// PodIP is the IP address of the pod/endpoint
 	PodIP string `json:"podIP,omitempty"`
 
 	// Healthy indicates if all checks are passing for this pod

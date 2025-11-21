@@ -25,17 +25,19 @@ var upgrader = websocket.Upgrader{
 
 // Server provides the dashboard API
 type Server struct {
-	client client.Client
-	cache  cache.Cache
-	hub    *WebSocketHub
+	client          client.Client
+	cache           cache.Cache
+	hub             *WebSocketHub
+	staticFilesPath string
 }
 
 // NewServer creates a new dashboard server
-func NewServer(client client.Client, cache cache.Cache) *Server {
+func NewServer(client client.Client, cache cache.Cache, staticFilesPath string) *Server {
 	return &Server{
-		client: client,
-		cache:  cache,
-		hub:    NewWebSocketHub(),
+		client:          client,
+		cache:           cache,
+		hub:             NewWebSocketHub(),
+		staticFilesPath: staticFilesPath,
 	}
 }
 
@@ -60,8 +62,15 @@ func (s *Server) Start(ctx context.Context, addr string) error {
 	// WebSocket route
 	router.HandleFunc("/ws/healthchecks", s.handleWebSocket)
 
-	// Serve static files (frontend) - would be embedded in production
-	router.PathPrefix("/").HandlerFunc(s.handleIndex)
+	// Serve static files from filesystem
+	if s.staticFilesPath != "" {
+		log.FromContext(ctx).Info("Serving static files", "path", s.staticFilesPath)
+		fs := http.FileServer(http.Dir(s.staticFilesPath))
+		router.PathPrefix("/").Handler(http.StripPrefix("/", fs))
+	} else {
+		// Fallback to API-only mode with instructions
+		router.PathPrefix("/").HandlerFunc(s.handleIndex)
+	}
 
 	// Start server
 	log.FromContext(ctx).Info("Starting dashboard server", "address", addr)
