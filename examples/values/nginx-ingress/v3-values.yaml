@@ -1,0 +1,53 @@
+# Example nginx-ingress v3 values.yaml
+# This represents the old structure before migration
+
+controller:
+  name: controller
+  image:
+    repository: k8s.gcr.io/ingress-nginx/controller
+    tag: "v1.0.0"
+    pullPolicy: IfNotPresent
+
+  # Old configuration structure
+  config:
+    use-forwarded-headers: "true"
+    compute-full-forwarded-for: "true"
+    proxy-body-size: "10m"
+
+  service:
+    enabled: true
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    externalTrafficPolicy: Local
+    ports:
+      http: 80
+      https: 443
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+
+# Old metrics configuration
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring
+
+# Old default backend
+defaultBackend:
+  enabled: true
+  name: default-backend
+  image:
+    repository: k8s.gcr.io/defaultbackend-amd64
+    tag: "1.5"

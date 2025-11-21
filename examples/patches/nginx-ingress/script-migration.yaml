@@ -1,0 +1,18 @@
+# Migration configuration for script-based format
+fromVersion: "3.x"
+toVersion: "4.0"
+format: script
+description: |
+  Migrates nginx-ingress chart values from v3 to v4 using a Bash script.
+
+  This approach provides maximum flexibility and can use any command-line
+  tools available in the environment (yq, jq, sed, awk, etc.).
+
+patchFile: v3-to-v4.script.sh
+
+validation:
+  requiredFields:
+    - controller
+  forbiddenFields:
+    - defaultBackend
+    - metrics

@@ -1,0 +1,23 @@
+# YQ expression-based migration for nginx-ingress v3 to v4
+# Each expression is applied sequentially to transform the values
+
+expressions:
+  # 1. Split image.repository into registry and image
+  - '.controller.image.registry = "registry.k8s.io"'
+  - '.controller.image.image = "ingress-nginx/controller"'
+  - 'del(.controller.image.repository)'
+
+  # 2. Rename config keys from kebab-case to camelCase
+  - '.controller.config.useForwardedHeaders = .controller.config."use-forwarded-headers"'
+  - 'del(.controller.config."use-forwarded-headers")'
+  - '.controller.config.computeFullForwardedFor = .controller.config."compute-full-forwarded-for"'
+  - 'del(.controller.config."compute-full-forwarded-for")'
+  - '.controller.config.proxyBodySize = .controller.config."proxy-body-size"'
+  - 'del(.controller.config."proxy-body-size")'
+
+  # 3. Move metrics from root to controller.metrics
+  - '.controller.metrics = .metrics'
+  - 'del(.metrics)'
+
+  # 4. Remove deprecated defaultBackend
+  - 'del(.defaultBackend)'
