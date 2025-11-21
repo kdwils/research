@@ -1,0 +1,43 @@
+apiVersion: monitoring.k8s.io/v1alpha1
+kind: HealthCheck
+metadata:
+  name: frontend-api-health
+  namespace: default
+spec:
+  targetRef:
+    kind: Service
+    name: frontend-api
+
+  interval: 30s
+  timeout: 10s
+  failureThreshold: 3
+  successThreshold: 1
+
+  checks:
+    - name: http-health-endpoint
+      type: HTTP
+      http:
+        scheme: HTTP
+        port: 8080
+        path: /health
+        expectedStatus:
+          - 200
+          - 204
+
+    - name: http-api-readiness
+      type: HTTP
+      http:
+        scheme: HTTP
+        port: 8080
+        path: /api/ready
+        expectedStatus:
+          - 200
+        expectedBodyContains: "\"ready\":true"
+
+  uptime:
+    enabled: true
+    windows:
+      - 1h
+      - 24h
+      - 7d
+      - 30d

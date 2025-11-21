@@ -1,0 +1,156 @@
+apiVersion: monitoring.k8s.io/v1alpha1
+kind: HealthCheck
+metadata:
+  name: database-health
+  namespace: production
+spec:
+  targetRef:
+    kind: Service
+    name: postgres-service
+
+  interval: 60s
+  timeout: 15s
+  failureThreshold: 2
+  successThreshold: 1
+
+  checks:
+    # TCP connection check
+    - name: tcp-connection
+      type: TCP
+      tcp:
+        port: 5432
+
+    # HTTP health endpoint
+    - name: http-health
+      type: HTTP
+      http:
+        scheme: HTTP
+        port: 8080
+        path: /health
+        expectedStatus:
+          - 200
+
+    # Custom exec check - verify database is accepting connections
+    - name: postgres-ready
+      type: Exec
+      exec:
+        command:
+          - /bin/sh
+          - -c
+          - pg_isready -h localhost -p 5432
+
+  uptime:
+    enabled: true
+    windows:
+      - 1h
+      - 24h
+      - 7d
+
+---
+apiVersion: monitoring.k8s.io/v1alpha1
+kind: HealthCheck
+metadata:
+  name: grpc-service-health
+  namespace: default
+spec:
+  targetRef:
+    kind: Service
+    name: grpc-api
+
+  interval: 30s
+  timeout: 5s
+
+  checks:
+    - name: grpc-health-check
+      type: gRPC
+      grpc:
+        port: 9090
+        service: "grpc.health.v1.Health"
+        useTLS: true
+
+  uptime:
+    enabled: true
+    windows:
+      - 1h
+      - 24h
+
+---
+apiVersion: monitoring.k8s.io/v1alpha1
+kind: HealthCheck
+metadata:
+  name: comprehensive-service-health
+  namespace: default
+spec:
+  targetRef:
+    kind: Service
+    name: my-app
+
+  interval: 30s
+  timeout: 10s
+  failureThreshold: 3
+  successThreshold: 1
+
+  checks:
+    # Basic connectivity
+    - name: tcp-8080
+      type: TCP
+      tcp:
+        port: 8080
+
+    # Health endpoint
+    - name: health-endpoint
+      type: HTTP
+      http:
+        scheme: HTTP
+        port: 8080
+        path: /health
+        httpHeaders:
+          - name: X-Health-Check
+            value: "true"
+        expectedStatus:
+          - 200
+
+    # Readiness endpoint with body validation
+    - name: readiness-check
+      type: HTTP
+      http:
+        scheme: HTTP
+        port: 8080
+        path: /ready
+        expectedStatus:
+          - 200
+        expectedBodyRegex: '"status":\s*"ready"'
+
+    # Metrics endpoint accessibility
+    - name: metrics-available
+      type: HTTP
+      http:
+        scheme: HTTP
+        port: 8080
+        path: /metrics
+        expectedStatus:
+          - 200
+
+    # Custom validation script
+    - name: custom-health-logic
+      type: Exec
+      exec:
+        command:
+          - /bin/sh
+          - -c
+          - |
+            # Check if application is truly ready
+            response=$(curl -s http://localhost:8080/api/status)
+            if echo "$response" | grep -q '"healthy":true'; then
+              exit 0
+            else
+              exit 1
+            fi
+
+  uptime:
+    enabled: true
+    windows:
+      - 1h
+      - 24h
+      - 7d
+      - 30d
