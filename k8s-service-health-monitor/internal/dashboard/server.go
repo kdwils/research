@@ -12,7 +12,8 @@ import (
 	"github.com/gorilla/websocket"
 	monitoringv1alpha1 "github.com/kdwils/k8s-service-health-monitor/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/labels"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"k8s.io/client-go/tools/cache"
+	ctrlcache "sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -26,13 +27,13 @@ var upgrader = websocket.Upgrader{
 // Server provides the dashboard API
 type Server struct {
 	client          client.Client
-	cache           cache.Cache
+	cache           ctrlcache.Cache
 	hub             *WebSocketHub
 	staticFilesPath string
 }
 
 // NewServer creates a new dashboard server
-func NewServer(client client.Client, cache cache.Cache, staticFilesPath string) *Server {
+func NewServer(client client.Client, cache ctrlcache.Cache, staticFilesPath string) *Server {
 	return &Server{
 		client:          client,
 		cache:           cache,

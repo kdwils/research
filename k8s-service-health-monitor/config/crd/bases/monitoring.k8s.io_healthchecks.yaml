@@ -1,0 +1,488 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  name: healthchecks.monitoring.k8s.io
+spec:
+  group: monitoring.k8s.io
+  names:
+    kind: HealthCheck
+    listKind: HealthCheckList
+    plural: healthchecks
+    shortNames:
+    - hc
+    - healthcheck
+    singular: healthcheck
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .spec.targetRef.name
+      name: Target
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: HealthCheck is the Schema for the healthchecks API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: HealthCheckSpec defines the desired state of HealthCheck
+            properties:
+              checks:
+                description: Checks is the list of health check definitions
+                items:
+                  description: Check defines a single health check
+                  properties:
+                    exec:
+                      description: Exec check configuration
+                      properties:
+                        command:
+                          description: Command to execute (exit code 0 = healthy)
+                          items:
+                            type: string
+                          minItems: 1
+                          type: array
+                      required:
+                      - command
+                      type: object
+                    grpc:
+                      description: gRPC check configuration
+                      properties:
+                        port:
+                          description: Port to connect to
+                          format: int32
+                          maximum: 65535
+                          minimum: 1
+                          type: integer
+                        service:
+                          default: grpc.health.v1.Health
+                          description: Service name for gRPC health check
+                          type: string
+                        useTLS:
+                          default: false
+                          description: UseTLS indicates whether to use TLS
+                          type: boolean
+                      required:
+                      - port
+                      type: object
+                    http:
+                      description: HTTP check configuration
+                      properties:
+                        expectedBodyContains:
+                          description: ExpectedBodyContains substring that must appear
+                            in response body
+                          type: string
+                        expectedBodyRegex:
+                          description: ExpectedBodyRegex pattern that must match response
+                            body
+                          type: string
+                        expectedStatus:
+                          description: 'ExpectedStatus codes (default: 200-399)'
+                          items:
+                            format: int32
+                            type: integer
+                          type: array
+                        host:
+                          description: Host to connect to (defaults to pod IP)
+                          type: string
+                        httpHeaders:
+                          description: HTTPHeaders to send with the request
+                          items:
+                            description: HTTPHeader represents an HTTP header
+                            properties:
+                              name:
+                                description: Name of the header
+                                type: string
+                              value:
+                                description: Value of the header
+                                type: string
+                            required:
+                            - name
+                            - value
+                            type: object
+                          type: array
+                        path:
+                          default: /
+                          description: Path to request
+                          type: string
+                        port:
+                          description: Port to connect to
+                          format: int32
+                          maximum: 65535
+                          minimum: 1
+                          type: integer
+                        scheme:
+                          default: HTTP
+                          description: Scheme (HTTP or HTTPS)
+                          enum:
+                          - HTTP
+                          - HTTPS
+                          type: string
+                      required:
+                      - port
+                      type: object
+                    name:
+                      description: Name of the check (must be unique within the HealthCheck)
+                      type: string
+                    tcp:
+                      description: TCP check configuration
+                      properties:
+                        port:
+                          description: Port to connect to
+                          format: int32
+                          maximum: 65535
+                          minimum: 1
+                          type: integer
+                      required:
+                      - port
+                      type: object
+                    type:
+                      allOf:
+                      - enum:
+                        - HTTP
+                        - TCP
+                        - gRPC
+                        - Exec
+                      - enum:
+                        - HTTP
+                        - TCP
+                        - gRPC
+                        - Exec
+                      description: Type of the health check
+                      type: string
+                  required:
+                  - name
+                  - type
+                  type: object
+                minItems: 1
+                type: array
+              endpoints:
+                description: |-
+                  Endpoints manually specifies target endpoints (external or override discovered)
+                  When specified, these endpoints are used instead of service discovery
+                items:
+                  description: ManualEndpoint specifies a manual endpoint to check
+                    (external or override)
+                  properties:
+                    address:
+                      description: Address is the IP address or hostname
+                      type: string
+                    labels:
+                      additionalProperties:
+                        type: string
+                      description: Labels for categorization and filtering
+                      type: object
+                    name:
+                      description: Name of the endpoint (for identification)
+                      type: string
+                  required:
+                  - address
+                  - name
+                  type: object
+                type: array
+              failureThreshold:
+                default: 3
+                description: FailureThreshold is the number of consecutive failures
+                  before marking unhealthy
+                format: int32
+                minimum: 1
+                type: integer
+              interval:
+                default: 30s
+                description: Interval specifies how often to execute health checks
+                type: string
+              successThreshold:
+                default: 1
+                description: SuccessThreshold is the number of consecutive successes
+                  to mark healthy again
+                format: int32
+                minimum: 1
+                type: integer
+              targetRef:
+                description: TargetRef references the Kubernetes resource to monitor
+                  (optional if Endpoints specified)
+                properties:
+                  kind:
+                    description: Kind of the target resource (currently only Service
+                      supported)
+                    enum:
+                    - Service
+                    type: string
+                  name:
+                    description: Name of the target resource
+                    type: string
+                  namespace:
+                    description: Namespace of the target resource (defaults to HealthCheck's
+                      namespace)
+                    type: string
+                required:
+                - kind
+                - name
+                type: object
+              timeout:
+                default: 10s
+                description: Timeout for each check execution
+                type: string
+              uptime:
+                description: Uptime tracking configuration
+                properties:
+                  enabled:
+                    default: true
+                    description: Enabled indicates whether uptime tracking is enabled
+                    type: boolean
+                  windows:
+                    description: Windows to track (e.g., "1h", "24h", "7d", "30d")
+                    items:
+                      type: string
+                    type: array
+                type: object
+            required:
+            - checks
+            type: object
+          status:
+            description: HealthCheckStatus defines the observed state of HealthCheck
+            properties:
+              checkResults:
+                description: CheckResults contains results for each defined check
+                items:
+                  description: CheckResult represents the result of a single check
+                  properties:
+                    consecutiveFailures:
+                      description: ConsecutiveFailures is the count of consecutive
+                        failed checks
+                      format: int32
+                      type: integer
+                    consecutiveSuccesses:
+                      description: ConsecutiveSuccesses is the count of consecutive
+                        successful checks
+                      format: int32
+                      type: integer
+                    healthy:
+                      description: Healthy indicates if the check is passing
+                      type: boolean
+                    lastCheckTime:
+                      description: LastCheckTime is when the check was last executed
+                      format: date-time
+                      type: string
+                    lastTransitionTime:
+                      description: LastTransitionTime is when the health status last
+                        changed
+                      format: date-time
+                      type: string
+                    message:
+                      description: Message provides additional context about the check
+                        result
+                      type: string
+                    name:
+                      description: Name of the check
+                      type: string
+                  required:
+                  - healthy
+                  - name
+                  type: object
+                type: array
+              conditions:
+                description: Conditions represent the latest available observations
+                items:
+                  description: "Condition contains details for one aspect of the current
+                    state of this API Resource.\n---\nThis struct is intended for
+                    direct use as an array at the field path .status.conditions.  For
+                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
+                    observations of a foo's current state.\n\t    // Known .status.conditions.type
+                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
+                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
+                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
+                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
+                    \   // other fields\n\t}"
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: |-
+                        type of condition in CamelCase or in foo.example.com/CamelCase.
+                        ---
+                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
+                        useful (see .node.status.conditions), the ability to deconflict is important.
+                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                description: ObservedGeneration reflects the generation of the most
+                  recently observed HealthCheck
+                format: int64
+                type: integer
+              phase:
+                allOf:
+                - enum:
+                  - Healthy
+                  - Degraded
+                  - Unhealthy
+                  - Unknown
+                - enum:
+                  - Healthy
+                  - Degraded
+                  - Unhealthy
+                  - Unknown
+                description: Phase is the overall health status
+                type: string
+              podHealth:
+                description: PodHealth contains per-pod health breakdown
+                items:
+                  description: PodHealthStatus represents health status for a single
+                    pod or endpoint
+                  properties:
+                    checksHealthy:
+                      description: ChecksHealthy is the count of passing checks
+                      format: int32
+                      type: integer
+                    checksUnhealthy:
+                      description: ChecksUnhealthy is the count of failing checks
+                      format: int32
+                      type: integer
+                    endpointName:
+                      description: EndpointName is the name of the endpoint (pod name
+                        or manual endpoint name)
+                      type: string
+                    endpointType:
+                      description: EndpointType indicates if this is a pod or manual
+                        endpoint
+                      type: string
+                    healthy:
+                      description: Healthy indicates if all checks are passing for
+                        this pod
+                      type: boolean
+                    lastCheckTime:
+                      description: LastCheckTime is when checks were last executed
+                        for this pod
+                      format: date-time
+                      type: string
+                    podIP:
+                      description: PodIP is the IP address of the pod/endpoint
+                      type: string
+                    podName:
+                      description: PodName is the name of the pod (for discovered
+                        pods)
+                      type: string
+                  required:
+                  - endpointName
+                  - healthy
+                  type: object
+                type: array
+              serviceEndpoints:
+                description: ServiceEndpoints contains discovered endpoint information
+                properties:
+                  ready:
+                    description: Ready is the number of ready endpoints
+                    format: int32
+                    type: integer
+                  total:
+                    description: Total is the total number of endpoints
+                    format: int32
+                    type: integer
+                type: object
+              uptime:
+                description: Uptime statistics for configured windows
+                items:
+                  description: UptimeStat represents uptime statistics for a time
+                    window
+                  properties:
+                    percentage:
+                      description: Percentage is the uptime percentage (0-100)
+                      maximum: 100
+                      minimum: 0
+                      type: number
+                    successfulChecks:
+                      description: SuccessfulChecks is the number of successful checks
+                      format: int64
+                      type: integer
+                    totalChecks:
+                      description: TotalChecks is the total number of checks in this
+                        window
+                      format: int64
+                      type: integer
+                    window:
+                      description: Window is the time window (e.g., "1h", "24h")
+                      type: string
+                  required:
+                  - percentage
+                  - window
+                  type: object
+                  x-kubernetes-validations:
+                  - message: percentage must be between 0 and 100
+                    rule: self.percentage >= 0 && self.percentage <= 100
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

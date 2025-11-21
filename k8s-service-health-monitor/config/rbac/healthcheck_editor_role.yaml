@@ -1,0 +1,27 @@
+# permissions for end users to edit healthchecks.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: k8s-service-health-monitor
+    app.kubernetes.io/managed-by: kustomize
+  name: healthcheck-editor-role
+rules:
+- apiGroups:
+  - monitoring.k8s.io
+  resources:
+  - healthchecks
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - monitoring.k8s.io
+  resources:
+  - healthchecks/status
+  verbs:
+  - get

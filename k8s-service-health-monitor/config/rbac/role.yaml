@@ -1,87 +1,57 @@
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: health-monitor-controller-role
-rules:
-  # HealthCheck CRs
-  - apiGroups: ["monitoring.k8s.io"]
-    resources: ["healthchecks"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: ["monitoring.k8s.io"]
-    resources: ["healthchecks/status"]
-    verbs: ["get", "update", "patch"]
-  - apiGroups: ["monitoring.k8s.io"]
-    resources: ["healthchecks/finalizers"]
-    verbs: ["update"]
-
-  # Service discovery
-  - apiGroups: [""]
-    resources: ["services", "endpoints", "pods"]
-    verbs: ["get", "list", "watch"]
-  - apiGroups: ["discovery.k8s.io"]
-    resources: ["endpointslices"]
-    verbs: ["get", "list", "watch"]
-
-  # Networking resources
-  - apiGroups: ["networking.k8s.io"]
-    resources: ["ingresses"]
-    verbs: ["get", "list", "watch"]
-  - apiGroups: ["gateway.networking.k8s.io"]
-    resources: ["gateways", "httproutes"]
-    verbs: ["get", "list", "watch"]
-
-  # Events
-  - apiGroups: [""]
-    resources: ["events"]
-    verbs: ["create", "patch"]
-
-  # Exec checks (pod exec)
-  - apiGroups: [""]
-    resources: ["pods/exec"]
-    verbs: ["create"]
-
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: health-monitor-dashboard-role
+  name: manager-role
 rules:
-  # Read-only access to HealthCheck CRs
-  - apiGroups: ["monitoring.k8s.io"]
-    resources: ["healthchecks"]
-    verbs: ["get", "list", "watch"]
-
-  # Read service info for context
-  - apiGroups: [""]
-    resources: ["services"]
-    verbs: ["get", "list"]
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: health-monitor-metrics-reader
-rules:
-  - nonResourceURLs:
-      - "/metrics"
-    verbs:
-      - get
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: health-monitor-proxy-role
-rules:
-  - apiGroups:
-      - authentication.k8s.io
-    resources:
-      - tokenreviews
-    verbs:
-      - create
-  - apiGroups:
-      - authorization.k8s.io
-    resources:
-      - subjectaccessreviews
-    verbs:
-      - create
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  - pods
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - monitoring.k8s.io
+  resources:
+  - healthchecks
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - monitoring.k8s.io
+  resources:
+  - healthchecks/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - monitoring.k8s.io
+  resources:
+  - healthchecks/status
+  verbs:
+  - get
+  - patch
+  - update
