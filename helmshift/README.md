@@ -1,189 +1,200 @@
 # HelmShift
 
-> Automate Helm values migration when chart schemas change
+> Automate Helm values migration with zero dependencies
 
-HelmShift is a flexible CLI tool that automates the migration of Helm `values.yaml` files when charts introduce breaking changes between versions. It supports multiple patch formats to accommodate different use cases and team preferences.
+HelmShift is a CLI tool that automates the migration of Helm `values.yaml` files when charts introduce breaking changes between versions. Migrations are fetched from a remote registry and applied using pure Go - no external tools required.
 
-## Features
+## ✨ Key Features
 
-- ✅ **Multiple Patch Formats**: JSON Patch (RFC 6902), yq expressions, and executable scripts
-- ✅ **User-Defined Migrations**: Patches are authored and stored separately from the tool
-- ✅ **CI/CD Native**: Designed for automation pipelines with dry-run mode
-- ✅ **Validation**: Pre and post-migration validation with custom rules
-- ✅ **Standalone**: No dependencies on Helm or Kubernetes
-- ✅ **Platform Agnostic**: Works with any CI/CD platform
+- 🌐 **Remote Migration Registry** - Migrations fetched from central registry, no local files needed
+- 🚀 **Zero Dependencies** - Pure Go implementation, no yq/jq/bash required
+- 📝 **Simple Declarative Format** - Easy-to-write operation-based transformations
+- 🔄 **Automatic Path Finding** - Migrates through multiple versions automatically (0.1 → 0.2 → 0.3)
+- 🔧 **CI/CD Ready** - Designed for automation pipelines
+- ✅ **Type-Safe** - Compile-time guarantees, no runtime script errors
 
-## Quick Start
+## 🎯 Design Philosophy
 
-### Installation
+**Problem**: Previous solutions required either:
+- Local migration files (needs file management in CI/CD)
+- External tool dependencies (yq, jq, bash scripts)
+- Migrations embedded in charts (requires pulling intermediate chart versions)
 
-#### Download Binary
+**HelmShift Solution**:
+1. Migrations stored in **remote registry** (fetch on-demand)
+2. **Pure Go execution** (no external tools)
+3. **Simple declarative operations** (no code/templates)
+
+See [DESIGN-V2.md](./DESIGN-V2.md) for complete architecture.
+
+## 📥 Installation
+
+### Download Binary
+
 ```bash
-VERSION="0.1.0"
+VERSION="0.2.0"
 wget https://github.com/user/helmshift/releases/download/v${VERSION}/helmshift-linux-amd64
 chmod +x helmshift-linux-amd64
 sudo mv helmshift-linux-amd64 /usr/local/bin/helmshift
 ```
 
-#### Build from Source
+### Build from Source
+
 ```bash
 git clone https://github.com/kdwils/helmshift.git
 cd helmshift
 go build -o helmshift ./cmd/helmshift
 ```
 
-### Basic Usage
-
-1. **Create a migration configuration**:
-
-```yaml
-# migration.yaml
-fromVersion: "3.x"
-toVersion: "4.0"
-format: jsonpatch
-description: "Migrate nginx-ingress from v3 to v4"
-patchFile: v3-to-v4.jsonpatch.yaml
-
-validation:
-  requiredFields:
-    - controller
-  forbiddenFields:
-    - defaultBackend
-```
-
-2. **Create a patch file**:
-
-```yaml
-# v3-to-v4.jsonpatch.yaml
-- op: add
-  path: /controller/image/registry
-  value: registry.k8s.io
-
-- op: remove
-  path: /controller/image/repository
-
-- op: move
-  from: /metrics
-  path: /controller/metrics
-```
-
-3. **Run the migration**:
+## 🚀 Quick Start
 
 ```bash
-# Dry-run (validate only)
-helmshift -config migration.yaml -values values.yaml -dry-run
+# Migrate nginx-ingress from v0.1.5 to v0.3.0
+helmshift -chart nginx-ingress \
+  -from 0.1.5 \
+  -to 0.3.0 \
+  -values values.yaml \
+  -registry https://migrations-registry.io
 
-# Migrate and output to stdout
-helmshift -config migration.yaml -values values.yaml
-
-# Migrate and save to file
-helmshift -config migration.yaml -values values.yaml -output new-values.yaml
+# Save to file
+helmshift -chart nginx-ingress \
+  -from 0.1.5 \
+  -to 0.3.0 \
+  -values values.yaml \
+  -output new-values.yaml
 ```
 
-## Patch Formats
+That's it! No local migration files needed.
 
-HelmShift supports three patch formats:
+## 📖 How It Works
 
-### 1. JSON Patch (RFC 6902)
-
-**Best for**: Standard, well-defined transformations
-
-```yaml
-# Format: jsonpatch
-- op: add
-  path: /new/field
-  value: "value"
-
-- op: remove
-  path: /old/field
-
-- op: replace
-  path: /field
-  value: "new value"
-
-- op: move
-  from: /old/location
-  path: /new/location
-```
-
-### 2. yq Expressions
-
-**Best for**: YAML-native transformations, structural changes
-
-```yaml
-# Format: yq
-expressions:
-  - '.new.field = "value"'
-  - 'del(.old.field)'
-  - '.new.location = .old.location'
-  - 'del(.old.location)'
-```
-
-### 3. Executable Scripts
-
-**Best for**: Complex logic, custom transformations
+### 1. User Runs Command
 
 ```bash
-#!/bin/bash
-# Format: script
-
-# Read from stdin, write to stdout
-yq eval '.new.field = "value"' |
-yq eval 'del(.old.field)' |
-yq eval '.new.location = .old.location' |
-yq eval 'del(.old.location)'
+helmshift -chart nginx-ingress -from 0.1.5 -to 0.3.0 -values values.yaml
 ```
 
-See [docs/patch-formats.md](docs/patch-formats.md) for detailed specifications.
+### 2. Tool Fetches Migration Index
 
-## Examples
-
-### Example: Migrating nginx-ingress v3 → v4
-
-The repository includes a complete example migrating the nginx-ingress chart from v3 to v4:
-
-```bash
-# Using JSON Patch
-./helmshift \
-  -config examples/patches/nginx-ingress/jsonpatch-migration.yaml \
-  -values examples/values/nginx-ingress/v3-values.yaml \
-  -output v4-values.yaml
-
-# Using script-based migration
-./helmshift \
-  -config examples/patches/nginx-ingress/script-migration.yaml \
-  -values examples/values/nginx-ingress/v3-values.yaml \
-  -output v4-values.yaml
-
-# Using yq expressions
-./helmshift \
-  -config examples/patches/nginx-ingress/yq-migration.yaml \
-  -values examples/values/nginx-ingress/v3-values.yaml \
-  -output v4-values.yaml
+```
+GET https://migrations-registry.io/nginx-ingress/index.yaml
 ```
 
-### Example Migration Changes
+Returns:
+```yaml
+chartName: nginx-ingress
+migrations:
+  - fromVersion: "0.1.x"
+    toVersion: "0.2.0"
+    url: "/nginx-ingress/0.1-to-0.2.yaml"
+  - fromVersion: "0.2.x"
+    toVersion: "0.3.0"
+    url: "/nginx-ingress/0.2-to-0.3.yaml"
+```
 
-The example demonstrates common migration scenarios:
+### 3. Tool Finds Migration Path
 
-- **Image repository structure change**: Split `repository` into `registry` and `image`
-- **Field naming convention change**: Rename from `kebab-case` to `camelCase`
-- **Configuration restructuring**: Move `metrics` from root to `controller.metrics`
-- **Deprecated feature removal**: Remove `defaultBackend` configuration
+Determines: `0.1.5 → 0.2.0 → 0.3.0`
 
-## CI/CD Integration
+### 4. Tool Fetches & Applies Migrations
 
-HelmShift works seamlessly with all CI/CD platforms:
+```
+GET /nginx-ingress/0.1-to-0.2.yaml  →  Apply operations
+GET /nginx-ingress/0.2-to-0.3.yaml  →  Apply operations
+```
+
+### 5. Output Migrated Values
+
+All transformations done in pure Go - no external tools!
+
+## 📝 Migration Format
+
+Simple, declarative operations (no code required):
+
+```yaml
+version: v1
+chartName: nginx-ingress
+fromVersion: "0.1.x"
+toVersion: "0.2.0"
+description: "Migrate nginx-ingress from v0.1 to v0.2"
+
+operations:
+  # Set a value
+  - op: set
+    path: controller.image.registry
+    value: "registry.k8s.io"
+
+  # Delete a value
+  - op: delete
+    path: controller.image.repository
+
+  # Move a value (copy + delete source)
+  - op: move
+    from: metrics
+    to: controller.metrics
+
+  # Copy with transformation
+  - op: copy
+    from: controller.config.proxy-body-size
+    to: controller.config.proxyBodySize
+    transform:
+      type: toCamelCase
+```
+
+### Supported Operations
+
+| Operation | Description |
+|-----------|-------------|
+| `set` | Set value at path |
+| `delete` | Delete value at path |
+| `move` | Move value (copy + delete source) |
+| `copy` | Copy value |
+
+### Built-in Transformations
+
+All pure Go (no external tools):
+
+- `stripPrefix` / `stripSuffix`
+- `replace`
+- `toUpperCase` / `toLowerCase`
+- `toCamelCase` / `toKebabCase` / `toSnakeCase`
+
+## 🏗️ Migration Registry
+
+### Structure
+
+```
+https://migrations-registry.io/
+├── nginx-ingress/
+│   ├── index.yaml          # Migration index
+│   ├── 0.1-to-0.2.yaml    # Migration operations
+│   └── 0.2-to-0.3.yaml
+├── prometheus/
+│   ├── index.yaml
+│   └── ...
+└── [other-charts]/
+```
+
+### Hosting Options
+
+- **GitHub Pages** (free)
+- **S3/GCS** (cloud storage)
+- **Existing Chart Repo** (reuse infrastructure)
+- **OCI Registry** (future support)
+
+## 🔧 CI/CD Integration
 
 ### GitHub Actions
 
 ```yaml
-- name: Migrate values
+- name: Migrate Helm values
   run: |
     helmshift \
-      -config migrations/v3-to-v4.yaml \
+      -chart nginx-ingress \
+      -from ${{ env.CURRENT_VERSION }} \
+      -to ${{ env.TARGET_VERSION }} \
       -values values.yaml \
-      -output new-values.yaml
+      -output migrated-values.yaml
 ```
 
 ### GitLab CI
@@ -191,123 +202,58 @@ HelmShift works seamlessly with all CI/CD platforms:
 ```yaml
 migrate:
   script:
-    - helmshift -config migrations/v3-to-v4.yaml -values values.yaml -output new-values.yaml
+    - helmshift -chart nginx-ingress -from 0.1.5 -to 0.3.0 -values values.yaml -output new-values.yaml
 ```
 
 ### Jenkins
 
 ```groovy
-sh 'helmshift -config migrations/v3-to-v4.yaml -values values.yaml -output new-values.yaml'
+sh 'helmshift -chart nginx-ingress -from 0.1.5 -to 0.3.0 -values values.yaml'
 ```
 
-See [docs/ci-integration.md](docs/ci-integration.md) for comprehensive integration patterns.
+No special setup needed - just run the binary!
 
-## CLI Reference
+## 📊 Examples
 
-```
-helmshift [options]
+See [examples/registry/](./examples/registry/) for:
+- Example migration registry structure
+- nginx-ingress migrations (0.1 → 0.2 → 0.3)
+- Sample values files
 
-Options:
-  -config string      Path to migration configuration file (required)
-  -values string      Path to values.yaml file to migrate (required)
-  -output string      Path to write migrated values (default: stdout)
-  -dry-run            Perform migration but don't write output
-  -timeout duration   Timeout for migration execution (default 30s)
-  -version            Show version information
-```
+## 🆚 Comparison
 
-### Exit Codes
+| Feature | HelmShift v2 | Manual Migration | helm-migrate-values |
+|---------|--------------|------------------|---------------------|
+| Local files required | ❌ | ✅ | ✅ |
+| External tools (yq/jq) | ❌ | ✅ | ❌ |
+| Kubernetes cluster | ❌ | ❌ | ✅ |
+| Multi-version jump | ✅ | ❌ | ✅ |
+| Pure Go | ✅ | ❌ | ❌ |
+| Learning curve | Low | High | Medium |
 
-- `0`: Success
-- `1`: Error (migration failed, validation failed, etc.)
+## 📚 Documentation
 
-## Project Structure
+- [DESIGN-V2.md](./DESIGN-V2.md) - Complete architecture and design decisions
+- [examples/](./examples/) - Sample migrations and registry structure
 
-```
-helmshift/
-├── cmd/
-│   └── helmshift/          # CLI entry point
-├── pkg/
-│   ├── config/             # Migration configuration
-│   ├── migration/          # Migration engine
-│   │   └── formats/        # Patch format implementations
-│   └── parser/             # YAML parsing utilities
-├── examples/
-│   ├── patches/            # Example migration patches
-│   │   └── nginx-ingress/
-│   └── values/             # Example values files
-│       └── nginx-ingress/
-├── docs/
-│   ├── research.md         # Research & design document
-│   ├── ci-integration.md   # CI/CD integration guide
-│   └── patch-formats.md    # Patch format specifications
-└── README.md
-```
-
-## Documentation
-
-- [Research & Design](docs/research.md) - Comprehensive analysis of existing tools and solution design
-- [CI/CD Integration](docs/ci-integration.md) - Integration patterns for various CI/CD platforms
-- [Patch Formats](docs/patch-formats.md) - Detailed patch format specifications
-
-## Comparison with Alternatives
-
-| Feature | HelmShift | helm-migrate-values | Manual Scripts |
-|---------|-----------|---------------------|----------------|
-| Multiple formats | ✅ | ❌ | ✅ |
-| Standalone tool | ✅ | ❌ (plugin) | ✅ |
-| Validation | ✅ | ❌ | ❌ |
-| Dry-run mode | ✅ | ⚠️ | ❌ |
-| Easy to learn | ✅ | ❌ | ⚠️ |
-| No cluster needed | ✅ | ❌ | ✅ |
-
-## Limitations (PoC)
-
-This is a proof-of-concept implementation with some limitations:
-
-1. **yq Format**: Simplified implementation (full yq library integration needed for production)
-2. **Validation**: Basic field-level checks (could be extended with JSON Schema)
-3. **Testing**: Manual testing only (unit/integration tests needed)
-4. **Performance**: Not optimized for very large values files
-
-See [docs/research.md](docs/research.md#proof-of-concept-limitations) for details.
-
-## Future Enhancements
-
-- [ ] Full yq library integration
-- [ ] JSON Schema validation support
-- [ ] Multi-step migration chains (v1→v2→v3 in one command)
-- [ ] Diff visualization
-- [ ] Interactive migration wizard
-- [ ] Helm plugin wrapper
-- [ ] Rollback capability
-
-## Contributing
-
-Contributions are welcome! Please:
+## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+2. Create feature branch
+3. Add tests
+4. Submit pull request
 
-## License
+## 📄 License
 
 Apache 2.0
 
-## Acknowledgments
+## 🙏 Acknowledgments
 
-- Inspired by [helm-migrate-values](https://github.com/OctopusDeployLabs/helm-migrate-values)
-- Uses [evanphx/json-patch](https://github.com/evanphx/json-patch) for JSON Patch support
-- Built with Go and love for automation
-
-## Support
-
-- 📖 [Documentation](docs/)
-- 🐛 [Issue Tracker](https://github.com/kdwils/helmshift/issues)
-- 💬 [Discussions](https://github.com/kdwils/helmshift/discussions)
+- Inspired by the need for better Helm migration tooling
+- Built with pure Go for maximum portability
 
 ---
 
 **Made with ❤️ for the Helm community**
+
+*Automate your migrations, simplify your life.*

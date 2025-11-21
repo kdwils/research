@@ -1,0 +1,20 @@
+version: v1
+chartName: nginx-ingress
+fromVersion: "0.2.x"
+toVersion: "0.3.0"
+description: |
+  Migrate nginx-ingress from v0.2 to v0.3
+
+  Changes:
+  - Move metrics configuration under controller
+  - Remove deprecated defaultBackend
+
+operations:
+  # 1. Move metrics from root to controller.metrics
+  - op: move
+    from: metrics
+    to: controller.metrics
+
+  # 2. Remove deprecated defaultBackend
+  - op: delete
+    path: defaultBackend

@@ -1,0 +1,15 @@
+# Migration Registry Index for nginx-ingress chart
+# This file would be hosted at: https://migrations-registry.io/nginx-ingress/index.yaml
+
+chartName: nginx-ingress
+
+migrations:
+  - fromVersion: "0.1.x"
+    toVersion: "0.2.0"
+    url: "/nginx-ingress/0.1-to-0.2.yaml"
+    description: "Update image structure, rename config keys to camelCase"
+
+  - fromVersion: "0.2.x"
+    toVersion: "0.3.0"
+    url: "/nginx-ingress/0.2-to-0.3.yaml"
+    description: "Move metrics under controller, remove deprecated defaultBackend"
